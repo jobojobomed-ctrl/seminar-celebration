@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>닥터조치과 · 세미나실 축하화면</title>
+<style>
+  :root{
+    --bar-bg:#1b1d22;
+    --bar-fg:#e9ecf1;
+    --accent:#5b8cff;
+    --chip:#2a2d34;
+    --chip-on:#3a64d8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:'Pretendard','Malgun Gothic','맑은 고딕',sans-serif;background:#0c0d10;color:var(--bar-fg);}
+  body{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+  /* ===== 컨트롤 바 ===== */
+  .controls{
+    flex:0 0 auto;background:var(--bar-bg);padding:12px 16px;
+    display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;
+    border-bottom:1px solid #2c2f36;z-index:5;
+  }
+  body.present .controls{display:none;}
+  .group{display:flex;flex-direction:column;gap:6px;}
+  .group > label{font-size:11px;color:#9aa1ad;letter-spacing:.04em;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .tab,.chip,.btn{
+    border:0;cursor:pointer;border-radius:9px;color:var(--bar-fg);
+    background:var(--chip);padding:9px 14px;font-size:14px;font-family:inherit;
+    transition:.15s;white-space:nowrap;
+  }
+  .tab:hover,.chip:hover,.btn:hover{filter:brightness(1.2);}
+  .tab.on{background:var(--chip-on);font-weight:600;}
+  .chip.on{outline:2px solid #fff;outline-offset:1px;}
+  .chip{width:46px;height:34px;padding:0;border-radius:8px;}
+
+  input[type=text]{
+    background:#101216;border:1px solid #343842;border-radius:9px;color:#fff;
+    padding:10px 12px;font-size:15px;font-family:inherit;min-width:220px;
+  }
+  input[type=text]:focus{outline:2px solid var(--accent);border-color:transparent;}
+
+  .toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:#c3c9d4;cursor:pointer;}
+  .btn.primary{background:var(--accent);font-weight:700;}
+  .btn.ghost{background:transparent;border:1px solid #3a3f49;}
+
+  .spacer{flex:1 1 auto;}
+
+  /* ===== 무대(스크린) ===== */
+  .stage{
+    position:relative;flex:1 1 auto;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;text-align:center;
+  }
+  .stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;}
+  .content{position:relative;z-index:3;padding:4vmin;max-width:92%;}
+
+  .eyebrow{
+    font-size:clamp(16px,2.4vw,34px);font-weight:600;letter-spacing:.18em;
+    opacity:.92;margin-bottom:2.2vh;text-transform:none;
+  }
+  .title{
+    font-size:clamp(40px,9.2vw,190px);font-weight:800;line-height:1.08;
+    margin:0;letter-spacing:-.01em;word-break:keep-all;
+    text-shadow:0 4px 30px rgba(0,0,0,.25);
+  }
+  .message{
+    font-size:clamp(22px,4.2vw,72px);font-weight:600;margin-top:2.6vh;
+    line-height:1.25;word-break:keep-all;opacity:.97;
+  }
+  .footer{
+    position:absolute;bottom:3.2vh;left:0;right:0;z-index:3;
+    font-size:clamp(13px,1.5vw,24px);opacity:.7;letter-spacing:.06em;
+  }
+  .footer.hide{display:none;}
+
+  .present-hint{
+    position:absolute;top:2vh;right:2vw;z-index:4;font-size:13px;opacity:0;
+    background:rgba(0,0,0,.35);padding:6px 12px;border-radius:20px;transition:opacity .4s;
+    pointer-events:none;
+  }
+  body.present .stage:hover .present-hint{opacity:.65;}
+
+  /* 풍선/조명 등 배경 장식 레이어 */
+  .decor{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;}
+</style>
+</head>
+<body>
+
+  <!-- ================= 컨트롤 ================= -->
+  <div class="controls">
+    <div class="group">
+      <label>상황 선택</label>
+      <div class="row" id="tabs"></div>
+    </div>
+
+    <div class="group">
+      <label>제목 (큰 글자)</label>
+      <input type="text" id="title" placeholder="예) 김지은 선생님">
+    </div>
+
+    <div class="group">
+      <label>메시지</label>
+      <input type="text" id="message" placeholder="예) 생일 축하합니다 🎂">
+    </div>
+
+    <div class="group">
+      <label>배경 테마</label>
+      <div class="row" id="themes"></div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="group">
+      <label>옵션</label>
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="dateOn" checked> 날짜·병원명 표시</label>
+        <label class="toggle"><input type="checkbox" id="fxOn" checked> 효과(꽃가루 등)</label>
+      </div>
+    </div>
+
+    <div class="group">
+      <label>&nbsp;</label>
+      <div class="row">
+        <button class="btn" id="replayBtn">효과 다시</button>
+        <button class="btn ghost" id="presentBtn">발표 모드</button>
+        <button class="btn primary" id="fsBtn">전체화면 ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 무대 ================= -->
+  <div class="stage" id="stage">
+    <div class="decor" id="decor"></div>
+    <canvas id="fx"></canvas>
+    <div class="content">
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 class="title" id="titleOut">제목을 입력하세요</h1>
+      <div class="message" id="messageOut"></div>
+    </div>
+    <div class="footer" id="footer"></div>
+    <div class="present-hint">ESC · 더블클릭으로 종료</div>
+  </div>
+
+<script>
+/* ===================== 템플릿 정의 ===================== */
+const TEMPLATES = {
+  birthday: {
+    label: "🎂 생일",
+    eyebrow: "HAPPY BIRTHDAY",
+    titlePH: "김지은 선생님",
+    msgDefault: "생일 축하합니다 🎂",
+    effect: "confetti",
+    themes: [
+      { c1:"#ffd6e8", c2:"#ffe9c7", fg:"#5a2a4a", swatch:"#ffb3d1", deco:"balloons" },
+      { c1:"#fbc2eb", c2:"#a6c1ee", fg:"#3a2f5a", swatch:"#c8a2f0", deco:"balloons" },
+      { c1:"#ff9a9e", c2:"#fad0c4", fg:"#4a1f24", swatch:"#ff7a85", deco:"balloons" },
+    ],
+  },
+  award: {
+    label: "🏆 시상식",
+    eyebrow: "AWARD",
+    titlePH: "이달의 우수사원 · 박서연 선생님",
+    msgDefault: "축하드립니다",
+    effect: "gold",
+    themes: [
+      { c1:"#11131c", c2:"#2a1f3d", fg:"#f7e7b6", swatch:"#caa84a", deco:"spotlight" },
+      { c1:"#1a1305", c2:"#3d2c0a", fg:"#ffe9a8", swatch:"#e0b94a", deco:"spotlight" },
+      { c1:"#0b1622", c2:"#15324a", fg:"#d8ecff", swatch:"#7fb6e0", deco:"spotlight" },
+    ],
+  },
+  welcome: {
+    label: "🎉 환영·입사",
+    eyebrow: "WELCOME",
+    titlePH: "이도윤 선생님",
+    msgDefault: "닥터조치과 가족이 되신 것을 환영합니다",
+    effect: "petals",
+    themes: [
+      { c1:"#a1ffce", c2:"#c9f0ff", fg:"#0e4a3a", swatch:"#7be3b0", deco:"bokeh" },
+      { c1:"#d4fc79", c2:"#96e6a1", fg:"#1f4a1f", swatch:"#aee06a", deco:"bokeh" },
+      { c1:"#cfe9ff", c2:"#e8f0ff", fg:"#1d3a66", swatch:"#9cc7ff", deco:"bokeh" },
+    ],
+  },
+  free: {
+    label: "✍ 자유 텍스트",
+    eyebrow: "",
+    titlePH: "오늘 회식은 6시입니다",
+    msgDefault: "",
+    effect: "none",
+    themes: [
+      { c1:"#232526", c2:"#414345", fg:"#f4f4f4", swatch:"#5a5d61", deco:"none" },
+      { c1:"#1f3a5f", c2:"#3b6fb0", fg:"#ffffff", swatch:"#4d86c9", deco:"none" },
+      { c1:"#f5f7fa", c2:"#dfe6ee", fg:"#222831", swatch:"#cfd8e3", deco:"none" },
+    ],
+  },
+};
+
+const HOSPITAL = "닥터조치과";
+
+/* ===================== 상태 ===================== */
+let state = { tpl: "birthday", theme: 0 };
+
+const $ = id => document.getElementById(id);
+const stage = $("stage"), decor = $("decor");
+const titleIn = $("title"), msgIn = $("message");
+
+/* ===================== UI 구성 ===================== */
+function buildTabs(){
+  $("tabs").innerHTML = "";
+  Object.entries(TEMPLATES).forEach(([key,t])=>{
+    const b = document.createElement("button");
+    b.className = "tab" + (key===state.tpl?" on":"");
+    b.textContent = t.label;
+    b.onclick = ()=>{ state.tpl=key; state.theme=0; applyTemplate(); buildTabs(); buildThemes(); };
+    $("tabs").appendChild(b);
+  });
+}
+function buildThemes(){
+  $("themes").innerHTML = "";
+  TEMPLATES[state.tpl].themes.forEach((th,i)=>{
+    const c = document.createElement("button");
+    c.className = "chip" + (i===state.theme?" on":"");
+    c.style.background = `linear-gradient(135deg,${th.c1},${th.c2})`;
+    c.onclick = ()=>{ state.theme=i; render(); buildThemes(); };
+    $("themes").appendChild(c);
+  });
+}
+
+/* 템플릿 바꿀 때: placeholder/기본 메시지 채우기 */
+function applyTemplate(){
+  const t = TEMPLATES[state.tpl];
+  titleIn.placeholder = t.titlePH;
+  msgIn.value = t.msgDefault;
+  render();
+  if($("fxOn").checked) runEffect();
+}
+
+/* ===================== 렌더 ===================== */
+function fmtDate(){
+  const d = new Date();
+  const days = ["일","월","화","수","목","금","토"];
+  return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()} (${days[d.getDay()]})`;
+}
+
+function render(){
+  const t = TEMPLATES[state.tpl];
+  const th = t.themes[state.theme];
+
+  stage.style.background = `linear-gradient(135deg,${th.c1} 0%,${th.c2} 100%)`;
+  stage.style.color = th.fg;
+
+  $("eyebrow").textContent = t.eyebrow;
+  $("eyebrow").style.display = t.eyebrow ? "block":"none";
+
+  const titleVal = titleIn.value.trim() || titleIn.placeholder;
+  $("titleOut").textContent = titleVal;
+  $("messageOut").textContent = msgIn.value.trim();
+
+  // 배경 장식
+  drawDecor(th.deco, th);
+
+  // 푸터
+  const ft = $("footer");
+  if($("dateOn").checked){
+    ft.classList.remove("hide");
+    ft.textContent = `${fmtDate()}  ·  ${HOSPITAL}`;
+    ft.style.color = th.fg;
+  } else ft.classList.add("hide");
+}
+
+/* ===================== 배경 장식 ===================== */
+function drawDecor(type, th){
+  decor.innerHTML = "";
+  if(type==="balloons"){
+    const colors=["#ff6b9d","#ffd166","#7ad7ff","#b18cff","#7be495"];
+    for(let i=0;i<7;i++){
+      const b=document.createElement("div");
+      const sz=60+Math.random()*70;
+      b.style.cssText=`position:absolute;bottom:-30%;left:${5+i*13+Math.random()*4}%;
+        width:${sz}px;height:${sz*1.2}px;border-radius:50%;
+        background:radial-gradient(circle at 35% 30%, #ffffffaa, ${colors[i%colors.length]});
+        opacity:.5;animation:floatUp ${10+Math.random()*8}s linear ${Math.random()*6}s infinite;`;
+      decor.appendChild(b);
+    }
+  } else if(type==="spotlight"){
+    decor.innerHTML=`
+      <div style="position:absolute;top:-20%;left:20%;width:40%;height:160%;
+        background:linear-gradient(180deg,#fff6cf55,transparent 70%);
+        transform:rotate(14deg);filter:blur(8px);"></div>
+      <div style="position:absolute;top:-20%;right:20%;width:40%;height:160%;
+        background:linear-gradient(180deg,#fff6cf55,transparent 70%);
+        transform:rotate(-14deg);filter:blur(8px);"></div>`;
+  } else if(type==="bokeh"){
+    for(let i=0;i<10;i++){
+      const d=document.createElement("div");
+      const sz=40+Math.random()*120;
+      d.style.cssText=`position:absolute;top:${Math.random()*100}%;left:${Math.random()*100}%;
+        width:${sz}px;height:${sz}px;border-radius:50%;background:#ffffff;
+        opacity:${.06+Math.random()*.12};filter:blur(2px);
+        animation:bob ${6+Math.random()*6}s ease-in-out ${Math.random()*4}s infinite alternate;`;
+      decor.appendChild(d);
+    }
+  }
+}
+
+/* 키프레임 동적 주입 */
+const sheet=document.createElement("style");
+sheet.textContent=`
+@keyframes floatUp{to{transform:translateY(-140vh) rotate(8deg);}}
+@keyframes bob{to{transform:translateY(-24px) translateX(14px);}}`;
+document.head.appendChild(sheet);
+
+/* ===================== 캔버스 효과 (꽃가루/골드/꽃잎) ===================== */
+const canvas=$("fx"), ctx=canvas.getContext("2d");
+let particles=[], raf=null;
+
+function sizeCanvas(){
+  const r=stage.getBoundingClientRect();
+  canvas.width=r.width; canvas.height=r.height;
+}
+window.addEventListener("resize",()=>{ sizeCanvas(); render(); });
+
+function runEffect(){
+  if(!$("fxOn").checked) return;
+  const eff = TEMPLATES[state.tpl].effect;
+  sizeCanvas();
+  particles=[];
+  if(eff==="none"){ ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+
+  const W=canvas.width;
+  const palettes={
+    confetti:["#ff6b9d","#ffd166","#5bc0eb","#9b5de5","#7be495","#ff9f1c"],
+    gold:["#f7d774","#e0b94a","#fff2c2","#c99a33"],
+    petals:["#ffffff","#dff5e8","#cfe9ff","#fbe5ff"],
+  };
+  const pal=palettes[eff];
+  const count = eff==="confetti"?170:eff==="gold"?120:90;
+  for(let i=0;i<count;i++){
+    particles.push({
+      x:Math.random()*W,
+      y:-Math.random()*canvas.height,
+      r:eff==="petals"?6+Math.random()*8:4+Math.random()*7,
+      vy:1.2+Math.random()*2.6,
+      vx:(Math.random()-.5)*1.4,
+      rot:Math.random()*6.28, vr:(Math.random()-.5)*.2,
+      color:pal[(Math.random()*pal.length)|0],
+      shape:eff==="petals"?"oval":(Math.random()<.5?"rect":"circle"),
+      sway:Math.random()*6.28,
+    });
+  }
+  cancelAnimationFrame(raf);
+  let frames=0;
+  (function loop(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{
+      p.sway+=0.03;
+      p.y+=p.vy; p.x+=p.vx+Math.sin(p.sway)*0.8; p.rot+=p.vr;
+      if(p.y>canvas.height+20){ p.y=-20; p.x=Math.random()*canvas.width; }
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+      ctx.fillStyle=p.color; ctx.globalAlpha=.9;
+      if(p.shape==="rect") ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*1.6);
+      else if(p.shape==="oval"){ ctx.beginPath(); ctx.ellipse(0,0,p.r,p.r*.55,0,0,6.28); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(0,0,p.r/2,0,6.28); ctx.fill(); }
+      ctx.restore();
+    });
+    frames++;
+    // 생일/환영 효과는 잠시 후 잔잔하게 멈춤(골드는 계속 잔잔히)
+    raf=requestAnimationFrame(loop);
+  })();
+}
+
+/* ===================== 발표/전체화면 ===================== */
+$("fsBtn").onclick=()=>{
+  if(stage.requestFullscreen) stage.requestFullscreen();
+  document.body.classList.add("present");
+};
+$("presentBtn").onclick=()=>{
+  document.body.classList.toggle("present");
+  sizeCanvas(); render();
+};
+document.addEventListener("fullscreenchange",()=>{
+  if(!document.fullscreenElement) document.body.classList.remove("present");
+  sizeCanvas(); render();
+});
+stage.addEventListener("dblclick",()=>{
+  if(document.fullscreenElement) document.exitFullscreen();
+  document.body.classList.remove("present");
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ document.body.classList.remove("present"); }
+});
+
+/* ===================== 이벤트 ===================== */
+titleIn.addEventListener("input",render);
+msgIn.addEventListener("input",render);
+$("dateOn").addEventListener("change",render);
+$("fxOn").addEventListener("change",()=>{ if($("fxOn").checked) runEffect(); else {ctx.clearRect(0,0,canvas.width,canvas.height); particles=[];} });
+$("replayBtn").onclick=runEffect;
+
+/* ===================== 시작 ===================== */
+buildTabs(); buildThemes(); applyTemplate();
+sizeCanvas();
+</script>
+</body>
+</html>
